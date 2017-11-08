@@ -8,17 +8,8 @@ var transition = function(state, action) {
   return categorical(nextProbs, nextStates);
 };
 
-var utility = function(state) {
-  var table = { 
-    A: 10,
-    B: 5,
-    C: 1
-  };
-  return table[state];
-};
 
-
-var expectedUtility = function(state, action) {
+var expectedUtility = function(state, action, utility) {
             return expectation(Infer({ 
               model() {
                 return utility(transition(state, action));
@@ -31,7 +22,7 @@ var softMaxAgent = function(state, beta, utility) {
       return Infer({ 
         model() {
           var action = uniformDraw(actions);
-          var eu = expectedUtility(state, action);
+          var eu = expectedUtility(state, action, utility);
           factor(eu/beta);
           
         return action;
@@ -40,19 +31,30 @@ var softMaxAgent = function(state, beta, utility) {
 
 };
 
-var observedTrajectory = [['start2','B'], ['start2','B'], 
-                          ['start2','B'], ['start2','A'], 
+var observedTrajectory = [['start2','A'], ['start2','A'], 
+                          ['start2','A'], ['start2','A'], 
                           ['start2','A']];
 
 
 var posterior = Infer({model() {
   var beta1 = sample(RandomInteger({n:10}))+1;
   var beta2 = sample(RandomInteger({n:10}))+5;
-
+  
   var getBeta = function(state){
     var table = {
       start1: beta1,
       start2: beta2
+    };
+    return table[state];
+  };
+  
+  var utilA = sample(RandomInteger({n:2}))+10;
+  var utilB = sample(RandomInteger({n:2}));
+  
+  var utility = function(state){
+    var table = {
+      A: utilA,
+      B: utilB
     };
     return table[state];
   };
