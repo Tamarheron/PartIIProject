@@ -17,38 +17,17 @@ var utility = function(state) {
   return table[state];
 };
 
-var makeBetas = function(){
-  var beta1 = sample(RandomInteger({n:10}))+1;
-  var beta2 = sample(RandomInteger({n:10})) + 10;
 
-  var getBeta = function(state){
-    var table = {
-      start1: beta1,
-      start2: beta2
-    };
-    return table[state];
-  };
-
-  return{
-    beta1, 
-    beta2,
-    getBeta
-  };
-};
+var expectedUtility = function(state, action) {
+            return expectation(Infer({ 
+              model() {
+                return utility(transition(state, action));
+              }
+            }));
+          };
 
 
-
-
-
-
-var softMaxAgent = function(state, beta) {
-      var expectedUtility = function(state, action) {
-        return expectation(Infer({ 
-          model() {
-            return utility(transition(state, action));
-          }
-        }));
-      };
+var softMaxAgent = function(state, beta, utility) {
       return Infer({ 
         model() {
           var action = uniformDraw(actions);
@@ -58,34 +37,37 @@ var softMaxAgent = function(state, beta) {
         return action;
         }
       });
+
 };
 
-var observedTrajectory = [['start1','A']];
+var observedTrajectory = [['start2','B'], ['start2','B'], 
+                          ['start2','B'], ['start2','A'], 
+                          ['start2','A']];
 
-var simulate = function(){
-  return Infer({ 
-      model() {
 
-        var state = uniformDraw(startStates);
-        softMaxAgent(state, getBeta(state), utility);
-      }
-  });
-};
+var posterior = Infer({model() {
+  var beta1 = sample(RandomInteger({n:10}))+1;
+  var beta2 = sample(RandomInteger({n:10}))+5;
 
-var posterior = Infer({ model() {
-  var betas = makeBetas();
-  var state = uniformDraw(startStates);
-  var beta = betas.getBeta(state);
+  var getBeta = function(state){
+    var table = {
+      start1: beta1,
+      start2: beta2
+    };
+    return table[state];
+  };
   // For each observed state-action pair, factor on likelihood of action
   map(
     function(stateAction){
       var state = stateAction[0];
+      var beta = getBeta(state);
       var action = stateAction[1];
-      observe(softMaxAgent(state, beta), action);
+      observe(softMaxAgent(state, beta, utility), action);
     },
     observedTrajectory);
-
-  return betas.beta1;
+  
+  //var beta2=betas.beta2;
+  return { beta2 };
 }});
 
-softMaxAgent(start1, getBeta(start1));
+viz(posterior);
