@@ -33,12 +33,13 @@ var softMaxAgent = function(state, beta, utility) {
 
 var observedTrajectory = [['start2','A'], ['start2','A'], 
                           ['start2','A'], ['start2','A'], 
-                          ['start2','A']];
+                          ['start2','A'], ['start2','A'],
+                          ['start2','B'], ['start2','B']];
 
 
 var posterior = Infer({model() {
-  var beta1 = sample(RandomInteger({n:10}))+1;
-  var beta2 = sample(RandomInteger({n:10}))+5;
+  var beta1 = sample(RandomInteger({n:8}))+1;
+  var beta2 = sample(RandomInteger({n:8}))+1;
   
   var getBeta = function(state){
     var table = {
@@ -47,9 +48,9 @@ var posterior = Infer({model() {
     };
     return table[state];
   };
-  
-  var utilA = sample(RandomInteger({n:2}))+10;
-  var utilB = sample(RandomInteger({n:2}));
+  var d = sample(RandomInteger({n:9}))-4
+  var utilA = 0;
+  var utilB = utilA + d;
   
   var utility = function(state){
     var table = {
@@ -69,7 +70,7 @@ var posterior = Infer({model() {
     observedTrajectory);
   
   //var beta2=betas.beta2;
-  return { beta2 };
+  return { beta2, d };
 }});
 
 viz(posterior);
