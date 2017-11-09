@@ -10,11 +10,7 @@ var transition = function(state, action) {
 
 
 var expectedUtility = function(state, action, utility) {
-            return expectation(Infer({ 
-              model() {
                 return utility(transition(state, action));
-              }
-            }));
           };
 
 
@@ -23,6 +19,11 @@ var softMaxAgent = function(state, beta, utility) {
         model() {
           var action = uniformDraw(actions);
           var eu = expectedUtility(state, action, utility);
+          print("action, state, beta, eu =");
+          print(action);
+          print(state);
+          print(beta);
+          print(eu);
           factor(eu/beta);
           
         return action;
@@ -31,13 +32,21 @@ var softMaxAgent = function(state, beta, utility) {
 
 };
 
-var observedTrajectory = [['start2','A'], ['start2','A'], 
-                          ['start2','A'], ['start2','A'], 
-                          ['start2','A'], ['start2','A'],
-                          ['start2','B'], ['start2','B']];
+var makeTrajectory = function(getBeta, utility, length) {
+  var step = function(){
+        var state = uniformDraw(startStates);
+        var action = sample(softMaxAgent(state, getBeta(state), utility));
+        return {state, action};
+  };
+  var res = step()
+  return length==0 ? [] : [res].concat(makeTrajectory(getBeta, utility, length-1));
+};
 
+var observedTrajectory = [['start2','A'], ['start2','A'], ['start2','A']];
 
-var posterior = Infer({model() {
+var posterior = dp.cache(function(observedTrajectory){
+  return Infer({model() {
+  //define priors
   var beta1 = sample(RandomInteger({n:8}))+1;
   var beta2 = sample(RandomInteger({n:8}))+1;
   
@@ -48,6 +57,7 @@ var posterior = Infer({model() {
     };
     return table[state];
   };
+  
   var d = sample(RandomInteger({n:9}))-4
   var utilA = 0;
   var utilB = utilA + d;
@@ -59,6 +69,7 @@ var posterior = Infer({model() {
     };
     return table[state];
   };
+  
   // For each observed state-action pair, factor on likelihood of action
   map(
     function(stateAction){
@@ -68,9 +79,43 @@ var posterior = Infer({model() {
       observe(softMaxAgent(state, beta, utility), action);
     },
     observedTrajectory);
-  
-  //var beta2=betas.beta2;
-  return { beta2, d };
-}});
 
-viz(posterior);
+  //var choice = d<0 ? 'A' : 'B' //choose the action with higher utility
+  return {d};
+  }});
+});
+
+var score = Infer( {model() {
+  //define true values
+  var trueBeta1 = sample(RandomInteger({n:8}))+1;
+  var trueBeta2 = sample(RandomInteger({n:8}))+1;
+  
+  var getTrueBeta = function(state){
+    var table = {
+      start1: trueBeta1,
+      start2: trueBeta2
+    };
+    return table[state];
+  };
+  
+  var trueD = sample(RandomInteger({n:9}))-4
+  var trueUtilA = 20;
+  var trueUtilB = trueUtilA + trueD;
+  
+  var trueUtility = function(state){
+    var table = {
+      A: trueUtilA,
+      B: trueUtilB
+    };
+    return table[state];
+  };
+  
+  var observedTrajectory = makeTrajectory(getTrueBeta, trueUtility, 10);
+  
+  var d = sample(posterior(observedTrajectory))
+  var sameSign = d*trueD >0; //true if d and trueD have same sign
+  var reward = sameSign ? 
+      expectation(Math.abs(trueD)) 
+   : -expectation(Math.abs(trueD))
+  
+}});
