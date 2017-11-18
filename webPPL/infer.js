@@ -15,7 +15,7 @@ var transition = function(state, action) {
 
 //distributions of true parameters and robot's belief
 var TRUEBETA1 = Categorical({ps:[1,1,1], vs:[1,2,3]});
-var TRUEBETA2 = Categorical({ps:[1,1,1], vs:[1,2,3]});
+var TRUEBETA2 = Categorical({ps:[1,1,1], vs:[4,2,3]});
 var TRUED = Categorical({ps:[1,1], vs:[-1,1]});
 
 var expectedUtility = function(state, action, utility) {
@@ -46,7 +46,7 @@ var softMaxAgent = function(state, beta, utility) {
       });
 
 };
-
+//generate sample trajectory
 var makeTrajectory = function(getBeta, utility, length) {
   var step = function(){
     var state = uniformDraw(startStates);
@@ -97,8 +97,9 @@ var posterior = dp.cache(function(observedTrajectory){
   }});
 });
 
-var humanScore = function() {
-  Infer( {model() {
+//model the regret of the human based on their beta level
+var humanScore = function(state) {
+  Infer( {model(){
   //define true values
   var trueBeta1 = sample(TRUEBETA1);
   var trueBeta2 = sample(TRUEBETA2);
@@ -122,10 +123,15 @@ var humanScore = function() {
     };
     return table[state];
   };
-    var state = uniformDraw(startStates);
+    
     var action = uniformDraw(actions);
     var eu = expectedUtility(state, action, trueUtility);
     var beta = getTrueBeta(state);
+    //print("state, action, eu, beta=");
+    //print(state);
+    //print(action);
+    //print(eu);
+    //print(beta);
     factor(eu/beta);
     var actualUtility = trueUtility(transition(action,state));
     var utilities = map(trueUtility, nextStates);
@@ -135,7 +141,7 @@ var humanScore = function() {
     //print(actualUtility);
     //print(maxUtility);
     //print(regret);
-    return {regret};
+    return {regret, state};
    }});
 };
 
@@ -174,8 +180,12 @@ var score = function(length){
   
 }});
 };
-var humanRegret = humanScore();
-
-var robotRegrets = map(score, [1,5,10,15,20]);
-map(viz, robotRegrets);
-viz(humanRegret);
+var start = Categorical({ps:[1,1], vs:startStates});
+//var observedTrajectory1 = [['start1','A'],['start1','A'],['start2','A'],['start2','A']];
+//var observedTrajectory2 = [['start1','A']];
+//viz(posterior(observedTrajectory1));
+//viz(posterior(observedTrajectory2));
+//var robotRegrets = map(score, [1,5,10,15,20]);
+//map(viz, robotRegrets);
+var humanRegret = map(humanScore, ['start1', 'start2']);
+map(viz,humanRegret);
