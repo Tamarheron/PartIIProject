@@ -146,7 +146,7 @@ var humanScore = function(state) {
 };
 
 
-var score = function(length){
+var robotScore = function(length){
   Infer( { model() {
   //define true values
   var trueBeta1 = sample(TRUEBETA1);
@@ -183,6 +183,65 @@ var score = function(length){
   
 }});
 };
+
+var naiveRobotScore = function(length){
+  Infer({model() {
+    //define true values
+  var trueBeta1 = sample(TRUEBETA1);
+  var trueBeta2 = sample(TRUEBETA2);
+  
+  var getTrueBeta = function(state){
+    var table = {
+      start1: trueBeta1,
+      start2: trueBeta2
+    };
+    return table[state];
+  };
+  
+  var trueD = sample(TRUED);
+  var trueUtilA = 20;
+  var trueUtilB = trueUtilA + trueD;
+  
+  var trueUtility = function(state){
+    var table = {
+      A: trueUtilA,
+      B: trueUtilB
+    };
+    return table[state];
+  };
+    
+  //function to count which is the most frequent action
+  var getCounts = function(traj) {
+    var count = function(target){
+      var test = function(stateActionPair) {
+        return (target == stateActionPair[1]) ? 1 : 0
+      }
+      var flags = map(test, traj); //array containing a 1 for each match
+      return sum(flags);
+    }
+    var counts = map(count, actions);
+    //print(counts);
+    return counts;
+  }
+  var observedTrajectory = makeTrajectory(getTrueBeta, trueUtility, length);
+  var posteriorVar = posterior(observedTrajectory);
+  var counts = getCounts(observedTrajectory);
+  var d = counts[1]-counts[0];
+  if (d==0) {
+    //in this case we choose at random
+    var regret = -0.5*Math.abs(trueD);
+    //print(regret);
+    return {regret,length};
+  } 
+  else{
+    var correctChoice = d*trueD >0; //true (we choose correctly) if d and trueD have same sign
+    var regret = correctChoice ? 0 : -Math.abs(trueD)
+    //print(regret);
+    return {regret,length};
+  }
+    
+  }});
+}
 //var observedTrajectory1 = [['start1','A'],['start1','A'],['start2','A'],['start2','A']];
 //var observedTrajectory2 = [['start1','A']];
 //var post1 = posterior(observedTrajectory1);
@@ -191,12 +250,20 @@ var score = function(length){
 //viz(post2);
 //print(expectation(post1));
 
-var robotRegrets = map(score, [1,2,3]);
+var robotRegrets = map(robotScore, [1,3,5,9]);
 print(robotRegrets);
-map(viz, robotRegrets);
 
-var humanRegrets = map(humanScore, ['start1', 'start2']);
-print(humanRegrets);
-map(viz,humanRegrets);
-var humanMeans = map(expectation, humanRegrets);
-var humanRegret = listMean(humanMeans);
+//var humanRegrets = map(humanScore, ['start1', 'start2']);
+//print(humanRegrets);
+//map(viz,humanRegrets);
+//var humanMeans = map(expectation, humanRegrets);
+//var humanRegret = listMean(humanMeans);
+//print(humanRegret);
+  
+var naiveRobotRegrets = map(naiveRobotScore, [1,3,5,9]);
+print("naive");
+print(naiveRobotRegrets);
+
+
+map(viz, robotRegrets);
+map(viz, naiveRobotRegrets);
