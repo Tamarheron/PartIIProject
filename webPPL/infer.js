@@ -164,14 +164,10 @@ var robotScore = function(length, d, getBeta){
   }});
 };
 
-//need to add args for true d and betas
-var naiveRobotScore = function(length, d, getBeta){
-  //Naive robot chooses the most frequent action from the observed traj
-  Infer({model() {   
-  
+
   //returns counts of how many times each action appears in a trajectory
-  var getCounts = function(traj) {
-    var count = function(target){
+ var getCounts = function(traj) {
+   var count = function(target){
       var test = function(stateActionPair) {
         return (target == stateActionPair[1]) ? 1 : 0
       }
@@ -180,34 +176,38 @@ var naiveRobotScore = function(length, d, getBeta){
     }
     var counts = map(count, actions);
     //print(counts);
-    return counts;
-  }
+    return counts;  
+ };
   
-  var observedTrajectory = makeTrajectory(length, d, getBeta);
-  var posteriorVar = posterior(observedTrajectory);
-  var counts = getCounts(observedTrajectory);
   
-  var frequencyDifference = counts[1]-counts[0];
-  if (frequencyDifference==0) {
-    //in this case, the two actions have equal frequencies 
-    //and robot chooses at random
-    var regret = -0.5*Math.abs(d);
-    //print(regret);
-    return {regret,length};
-  } 
-  else{ //robot chooses most frequent action
-    var correctChoice = d*frequencyDifference >0; 
-    //true (robot chooses correctly) if d and frequencyDifference have same sign
-    var regret = correctChoice ? 0 : -Math.abs(d)
-    //print(regret);
-    return {regret,length};
-  }
-    
+
+var naiveRobotScore = function(length, d, getBeta){
+  //Naive robot chooses the most frequent action from the observed traj
+  Infer({model() {  
+    var observedTrajectory = makeTrajectory(length, d, getBeta);
+    var counts = getCounts(observedTrajectory);
+
+    var frequencyDifference = counts[1]-counts[0];
+    if (frequencyDifference==0) {
+      //in this case, the two actions have equal frequencies 
+      //and robot chooses at random
+      var regret = -0.5*Math.abs(d);
+      //print(regret);
+      return {regret,length};
+    } 
+    else{ //robot chooses most frequent action
+      var correctChoice = d*frequencyDifference >0; 
+      //true (robot chooses correctly) if d and frequencyDifference have same sign
+      var regret = correctChoice ? 0 : -Math.abs(d)
+      //print(regret);
+      return {regret,length};
+    }
+
   }});
 };
 
 var sampleBeta1 = 1;
-var sampleBeta2 = 2;
+var sampleBeta2 = 1;
 
 var getSampleBeta = function(state){
     var table = {
@@ -242,17 +242,16 @@ var getSampleBeta = function(state){
 //  robotScore, [1,3], [5,5]),[getSampleBeta, getSampleBeta]);
 //print(robotRegrets);
 
-//var humanRegret = humanScore('start1', 10, 5);
-//var humanRegrets = map2(humanScore, ['start1', 'start2'], [sampleBeta1, sampleBeta2]);
-//print(humanRegret);
-//viz(humanRegret);
+var humanRegret = humanScore('start1', 1, 1);
+print(humanRegret);
+viz(humanRegret);
 
 //map(viz,humanRegrets);
 //var humanMeans = map(expectation, humanRegrets);
 //var humanRegret = listMean(humanMeans);
 //print(humanRegret);
   
-var naiveRobotRegret = naiveRobotScore(5, 5, getSampleBeta);
+var naiveRobotRegret = naiveRobotScore(1, 1, getSampleBeta);
 print("naive");
 print(naiveRobotRegret);
 viz(naiveRobotRegret);
