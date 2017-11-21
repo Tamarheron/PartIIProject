@@ -22,8 +22,8 @@ var transition = function(state, action) {
 
 //distributions of true parameters and robot's belief
 var TRUED = Categorical({ps:[1,1], vs:[-1,1]});
-var TRUEBETA1 = Categorical({ps:[1,1,1], vs:[1,2,3]});
-var TRUEBETA2 = Categorical({ps:[1,1,1], vs:[4,2,3]});
+var TRUEBETA1 = Categorical({ps:[1,1,1], vs:[1,10]});
+var TRUEBETA2 = Categorical({ps:[1,1,1], vs:[1,10]});
 
 var TRUEUTILA = 20;
 
@@ -54,7 +54,7 @@ var getUtilities = function(d){
 };
 
 var expectedUtility = function(state, action, d) {
-       return expectation(Infer({ model() { 
+       return expectation(Infer({method:"enumerate", model() { 
          var current = state;
          //print(transition(current, action));
          var next = sample(transition(current, action));
@@ -69,7 +69,7 @@ var softMaxAgent = function(state, beta, d) {
         model() {
           var action = uniformDraw(actions);
           var eu = expectedUtility(state, action, d);
-          var debugPrint = false;
+          var debugPrint = !(beta*d*eu<9999999);
           if (debugPrint){
             print("action, state, beta, d, eu =");
             print(action);
@@ -104,7 +104,7 @@ var makeTrajectory = function(length, d, getBeta) {
 
 var posterior = function(observedTrajectory){
   return Infer({model(){
-    //sample possible values of d, beta1, beta2
+    //sample from priors
     var d = sample(TRUED);
     var beta1 = sample(TRUEBETA1);
     var beta2 = sample(TRUEBETA2);
@@ -157,18 +157,32 @@ var robotScore = function(length, d, getBeta){
     var observedTrajectory = makeTrajectory(length, d, getBeta);
     var posteriorD = posterior(observedTrajectory);  
     var estimateD = expectation(posteriorD);
-    var correctChoice = (d*estimateD) >0; //true if d and estimateD have same sign
-    var regret = correctChoice ? 0 : -Math.abs(d);
     var debug = false;
-    if (debug) {
-      print("posterior, correct, estimateD, regret")
-      print(posteriorD);
-      print(correctChoice);
-      print(estimateD);
-      print(regret);    
-    };
-    return regret;
-  }});
+    if (Math.abs(estimateD) < 0.000001){ // robot chooses randomly
+       var regret = -Math.abs(d)*0.5;
+       if (debug) {
+        print("traj, posterior, estimateD, regret")
+        print(observedTrajectory)
+        print(posteriorD);
+        print(estimateD);
+        print(regret);    
+      }
+       return regret;
+      }
+    else{
+      var correctChoice = (d*estimateD)>0; //true if d and estimateD have same sign
+      var regret = correctChoice ? 0 : -Math.abs(d);
+      
+      if (debug) {
+        print("traj, posterior, correct, estimateD, regret")
+        print(observedTrajectory)
+        print(posteriorD);
+        print(correctChoice);
+        print(estimateD);
+        print(regret);    
+      };
+      return regret;
+  }}});
 };
 
 
@@ -200,7 +214,7 @@ var naiveRobotScore = function(length, d, getBeta){
       //and robot chooses at random
       var regret = -0.5*Math.abs(d);
       //print(regret);
-      return {regret,length};
+      return regret;
     } 
     else{ //robot chooses most frequent action
       var correctChoice = d*frequencyDifference >0; 
@@ -224,39 +238,32 @@ var getSampleBeta = function(state){
     return table[state];
 };
 
-var simulateRobot = function (scorer, lengths, ds, beta1, beta2) {
-  return expectation(Infer({ model(){
-    var length = uniformDraw(lengths);
-    var d = uniformDraw(ds);
-    var getBeta = function(state){
-      var table = {
-        start1: sample(beta1),
-        start2: sample(beta2)
-      };
-      return table[state];
-    };
-    var expectedScore = expectation(scorer(arg1, arg2, arg3));
-    var debug = false;
-    if (debug) {
-      print("1,2,3, expectedScore =");
-      print(arg1);
-      print(arg2);
-      print(arg3);
-      print(expectedScore);
-    }
-    return expectedScore;
-  }}));
-};
-
-var simulateHuman = function (scorer, states, ds, betas) {
-  return Infer({ model(){
-    var getBeta = function(state){
+var simulateRobot = function (scorer, lengths, ds, betas) {
+  var getBeta = function(state){
       var table = {
         start1: betas[0],
         start2: betas[1]
       };
       return table[state];
     };
+  
+  return Infer({method:"enumerate", model(){
+    var length = uniformDraw(lengths);
+    var d = uniformDraw(ds);
+    var expectedScore = expectation(scorer(length, d, getBeta));
+    var debug = true;
+    if (debug) {
+      print("length, d,expectedScore =");
+      print(length);
+      print(d);
+      print(expectedScore);
+    }
+    return expectedScore;
+  }});
+};
+
+var simulateHuman = function (scorer, states, ds, betas) {
+    var dists = map3()
     var state = uniformDraw(states);
     var beta = getBeta(state);
     var d = uniformDraw(ds);
@@ -274,7 +281,7 @@ var simulateHuman = function (scorer, states, ds, betas) {
 };
 
 
-var humanRegret = humanScore('start1', 1, 1);
+var humanRegret = humanScore('start1', 1, 1.5);
 print(humanRegret);
 viz(humanRegret);
 
@@ -283,28 +290,42 @@ viz(humanRegret);
 //print(scores);
 //viz(scores);
 
-var scores2 = map( 
-  function([beta1, beta2]) { return expectation(simulateHuman(
+var betas = [[1,1],[2,2],[3,3],[4,4], [5,5], [6,6], [7,7]];
+
+var humanScoresBetas = function(betas){
+  return map(function(pair) { return expectation(simulateHuman(
     humanScore, 
     startStates, 
     [1],
-    [beta1, beta2]
-  ));},
-  [[1,1],[2,2],[3,3],[4,4], [5,5], [6,6], [7,7]]);
+    pair));
+                            },
+    betas
+            );
+};
 
-print(scores2);
-viz(scores2);
- 
-//map(viz,humanRegrets);
-//var humanMeans = map(expectation, humanRegrets);
-//var humanRegret = listMean(humanMeans);
-//print(humanRegret);
-  
-//var naiveRobotRegret = naiveRobotScore(1, 1, getSampleBeta);
-//print("naive");
-//print(naiveRobotRegret);
-//viz(naiveRobotRegret);
+var robotScoresLengths = function(lengths, type){
+  return map(function(length) { return expectation(simulateRobot(
+    type, 
+    [length], 
+    [1],
+    [1,10]));
+                            },
+    lengths
+            );
+};
 
-//map(viz, robotRegrets);
-//viz(robotscore);
-//map(viz, naiveRobotRegrets);
+var getBeta = function(state){
+      var table = {
+        start1: 1,
+        start2: 10
+      };
+      return table[state];
+    };
+var lengths = [10];
+//var scores1 = robotScoresLengths(lengths, robotScore);
+//var scores2 = robotScoresLengths(lengths, naiveRobotScore);
+var scores3 = expectation(robotScore(10, 1, getBeta));
+//print(scores1);
+print(scores3);
+//viz.bar(lengths, scores1);
+viz.bar(lengths, scores3); 
