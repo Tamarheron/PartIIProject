@@ -138,7 +138,7 @@ var makeTrajectory = function(options) {
   var transition=MDP.getTransition;
   
   var step = function(options){
-    console.log('calling step');
+    //console.log('calling step');
     assert.ok(_.has(options, 'state') &&
               _.has(options, 'length'), 
                  'makeTrajectory.step args:' +
@@ -210,6 +210,31 @@ var posterior = function(options){
   }});
 };
 
+//calculate average utility achieved by human
+var humanScore = function(options) {
+  assert.ok(_.has(options, 'MDP') &&
+           _.has(options, 'length') &&
+           _.has(options, 'discount'), 'humanScore args: missing one or more'+
+           'of MDP, length, discount');
+  
+  var getUtility = options.MDP.getUtility;
+  var agent = softMaxAgent({MDP:options.MDP, discount:options.discount});
+  
+  //calculate average utility achieved by human
+  return expectation(Infer( { model(){
+    var traj = makeTrajectory({MDP:options.MDP, length:options.length,
+                              agent:agent});
+    var utilities = map(
+      function(stateaction){
+        var state = stateaction[0];
+        return getUtility(state);
+      }, traj);
+    
+    var total = sum(utilities);
+    return total;
+   }}));
+};
+
 var actions = [['A', 'B'],['A', 'B'], ['A', 'B'], ['A', 'B']];
 var transition = function(options) {
   assert.ok( _.has(options, 'state') && 
@@ -224,7 +249,7 @@ var transition = function(options) {
 var states = ['start1', 'start2', 'A', 'B'];
 var startStates = ['start1','start2'];
 var betas = [1,1,1,10];
-var utilities = [1,1,1,20];
+var utilities = [1,1,1,2];
 
 var params = {actions:actions, transitions:transition, states:states, 
               startStates:startStates};
@@ -247,6 +272,9 @@ var traj = makeTrajectory({length:10, agent:agent, MDP:MDP});
 
 print(traj);
 
-var post = posterior({priors:priors, MDPParams:params, 
-                      discount:0.9, observedTrajectory:traj});
-viz(post);
+//var post = posterior({priors:priors, MDPParams:params, 
+//                      discount:0.9, observedTrajectory:traj});
+//viz(post);
+
+var score = humanScore({MDP:MDP, discount:0.9, length:9});
+print(score);
