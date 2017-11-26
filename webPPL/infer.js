@@ -1,3 +1,7 @@
+var max = function(a,b){
+  return Math.max(a,b);
+};
+
 var createMDP = function(options){
   // takes parameters: states, startStates, actions, transitions, utilities, betas
   assert.ok(_.has(options, 'states') &&
@@ -18,7 +22,7 @@ var createMDP = function(options){
   
   var getActions = function(state){
     var index = options.states.indexOf(state);
-    assert.ok((index!=-1), 'state not found');
+    assert.ok((index!=-1), 'state '+state+' not found');
     return options.actions[index];
   };
   
@@ -210,6 +214,21 @@ var posterior = function(options){
   }});
 };
 
+var getTotalUtility = function(options){
+  assert.ok(_.has(options, 'traj') &&
+           _.has(options, 'getUtility'),
+           'getTotalUtility args missing one or more of traj, getUtility') 
+  var getUtility = options.getUtility;
+  var utilities = map(
+      function(stateaction){
+        var state = stateaction[0];
+        return getUtility(state);
+      }, options.traj);
+    
+    var total = sum(utilities);
+    return total;
+}
+
 //calculate average utility achieved by human
 var humanScore = function(options) {
   assert.ok(_.has(options, 'MDP') &&
@@ -224,16 +243,105 @@ var humanScore = function(options) {
   return expectation(Infer( { model(){
     var traj = makeTrajectory({MDP:options.MDP, length:options.length,
                               agent:agent});
-    var utilities = map(
-      function(stateaction){
-        var state = stateaction[0];
-        return getUtility(state);
-      }, traj);
-    
-    var total = sum(utilities);
-    return total;
+    var utility = getTotalUtility({getUtility:getUtility, traj:traj});
+    return utility;
    }}));
 };
+
+
+//function to count which is the most frequent action for each state
+var getCounts = function(options) {
+  assert.ok(_.has(options, 'traj') &&
+           _.has(options, 'states') &&
+           _.has(options, 'getActions'), 'getCounts args: missing one or more '+
+           'of traj, states, getActions');
+  
+  var getActions = options.getActions;
+  
+   var count = function(state, action){
+      var test = function(stateActionPair) {
+        return ((state==stateActionPair[0])&&(action==stateActionPair[1])) ? 1 : 0
+      }
+      var flags = map(test, options.traj); //array containing a 1 for each match
+      return sum(flags);
+   }
+   
+   //for each state, list for each available action the counts for that action
+   var counts = 
+       map(
+         function(state){
+           return map(
+             function(action){
+               return count(state, action);
+             }, 
+             getActions(state)
+           )},
+         options.states
+       );
+  
+    //print(counts);
+    return counts;
+};
+ 
+
+var naiveRobotScore = function(options){
+  //Naive robot chooses the most frequent action taken in each state
+  //in the observed traj
+  var debug=false;
+  
+  assert.ok(_.has(options, 'MDP') &&
+           _.has(options, 'length') &&
+           _.has(options, 'discount'), 'naiveRobot Score args: missing one '+
+           'or more of MDP, length, discount');
+  
+  var MDP=options.MDP;
+  var getUtility = MDP.getUtility;
+  var states = MDP.states;
+  var agent = softMaxAgent({MDP:MDP, discount:options.discount});
+  var length = options.length;
+  
+  var robotAction = function(state, counts){
+    var index = states.indexOf(state);
+    assert.ok((index!=-1), 'robotAction: state not found');
+    var actionCounts = counts[index];
+    var maxActionCount = reduce(max, -9999999, actionCounts);
+    
+    //if multiple actions are most frequent, return the first one
+    var mostFrequentAction = actionCounts.indexOf(maxActionCount);
+    return mostFrequentAction;
+  }
+  
+  Infer({model() {  
+    var observedTraj = makeTrajectory({MDP:MDP, length:length, agent:agent}); 
+    var counts = getCounts(observedTrajectory);
+    var start = uniformDraw(MDP.startStates);
+    
+    var step = function(options){
+      assert.ok(_.has(options, 'state') &&
+                _.has(options, 'length'), 
+                'makeTrajectory.step args:' +
+                'one or more of length, state is missing');
+      var state=options.state;
+      var length=options.length;
+      var action = robotAction(state);
+      var transDist = transition({state:state, action:action})
+      var next = sample(transDist);
+      var res = [state, action];
+      var newLength = length-1;
+      
+      if (debug) {console.log('action: ' + action + ' transDist: '+transDist+
+                              ' length: '+length +' newLen: '+newLength+ ' next: '+ next);};
+      return length==1 ? 
+        [res] : 
+      [res].concat(step({state:next, length: newLength}));
+    };
+  
+   var robotTraj = step({state:start, length:length}); 
+   if (debug) {print(robotTraj);}
+   return getTotalUtility(robotTraj);
+  }});
+};
+
 
 var actions = [['A', 'B'],['A', 'B'], ['A', 'B'], ['A', 'B']];
 var transition = function(options) {
@@ -278,3 +386,9 @@ print(traj);
 
 var score = humanScore({MDP:MDP, discount:0.9, length:9});
 print(score);
+//var getActions = MDP.getActions;
+//print(actions)
+//print(states);
+//print(map(getActions, states));
+//var counts = getCounts({states:states, getActions:getActions, traj:traj});
+//print(counts);
