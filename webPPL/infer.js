@@ -31,7 +31,7 @@ var createMDP = function(options){
     assert.ok((index!=-1), 'state not found');
     return options.utilities[index];
   };
-  
+  var transitions = options.transitions;
   var getTransition = options.transitions;
   var startStates = options.startStates;
   var length = options.length;
@@ -55,7 +55,8 @@ var createMDP = function(options){
   };
   
   return{getBeta, getActions, getUtility, getExpectedUtility,
-         getTransition, startStates, states};
+         getTransition, startStates, states, actions, transitions,
+        utilities, betas};
 };
 
   
@@ -171,9 +172,14 @@ var posterior = function(options){
   assert.ok(_.has(options, 'priors') &&
             _.has(options, 'MDPParams') &&
             _.has(options, 'discount') &&
-           _.has(options, 'observedTrajectory'),
+            _.has(options, 'beta') &&
+            _.has(options, 'observedTrajectory'),
            'posterior args missing one or more of ' +
-            'priors, MDPParams,discount, observedTrajectory');
+            'priors, MDPParams,discount, beta, observedTrajectory');
+  
+  var betaType=options.beta;
+  //assert.ok((betaType=='fixed') || (betaType=='variable'), 'beta must be "fixed"+
+  //          ' or "variable"');
   
   var priors = options.priors;
   var traj = options.observedTrajectory;
@@ -189,7 +195,12 @@ var posterior = function(options){
   return Infer({method:"enumerate",model(){
     //sample from priors
     var utilities = map(sample,priors.utilities);
+    if (betaType=='variable'){
     var betas = map(sample,priors.betas);
+    } else if (betaType=='fixed'){
+      var beta = sample(priors.betas)
+      var betas = mapN(function(n) {return beta}, utilities.length);
+    } 
     
     if (debug) {console.log('sample utilities '+utilities+', betas: '+betas)}
     
@@ -287,7 +298,8 @@ var getCounts = function(options) {
 var naiveRobotScore = function(options){
   //Naive robot chooses the most frequent action taken in each state
   //in the observed traj
-  var debug=false;
+  var debug1=false;
+  var debug2=false;
   
   assert.ok(_.has(options, 'MDP') &&
            _.has(options, 'length') &&
@@ -296,6 +308,7 @@ var naiveRobotScore = function(options){
   
   var MDP=options.MDP;
   var getUtility = MDP.getUtility;
+  var getActions = MDP.getActions;
   var states = MDP.states;
   var agent = softMaxAgent({MDP:MDP, discount:options.discount});
   var length = options.length;
@@ -306,14 +319,21 @@ var naiveRobotScore = function(options){
     var actionCounts = counts[index];
     var maxActionCount = reduce(max, -9999999, actionCounts);
     
-    //if multiple actions are most frequent, return the first one
-    var mostFrequentAction = actionCounts.indexOf(maxActionCount);
-    return mostFrequentAction;
+    //if multiple actions are most frequent, randomly return first or last one
+    var mostFrequentAction1 = actionCounts.indexOf(maxActionCount);
+    var mostFrequentAction2 = actionCounts.lastIndexOf(maxActionCount);
+    var actionIndex = uniformDraw([mostFrequentAction1, mostFrequentAction2]);
+    var actions = getActions(state);
+    return actions[actionIndex];
   }
   
-  Infer({model() {  
-    var observedTraj = makeTrajectory({MDP:MDP, length:length, agent:agent}); 
-    var counts = getCounts(observedTrajectory);
+  return expectation(Infer({ model() {  
+    var observedTrajectory = makeTrajectory({MDP:MDP, length:length, agent:agent}); 
+    var counts = getCounts({traj:observedTrajectory, states:states,
+                            getActions:getActions});
+    
+    
+   
     var start = uniformDraw(MDP.startStates);
     
     var step = function(options){
@@ -323,23 +343,69 @@ var naiveRobotScore = function(options){
                 'one or more of length, state is missing');
       var state=options.state;
       var length=options.length;
-      var action = robotAction(state);
+      var action = robotAction(state, counts);
       var transDist = transition({state:state, action:action})
       var next = sample(transDist);
       var res = [state, action];
       var newLength = length-1;
       
-      if (debug) {console.log('action: ' + action + ' transDist: '+transDist+
-                              ' length: '+length +' newLen: '+newLength+ ' next: '+ next);};
+      if (debug1) {console.log('action: ' + action + ' transDist: '+transDist+
+                              ' length: '+length +' newLen: '+newLength+
+                              ' next: '+ next + ' counts: '+counts);};
       return length==1 ? 
         [res] : 
       [res].concat(step({state:next, length: newLength}));
     };
   
    var robotTraj = step({state:start, length:length}); 
-   if (debug) {print(robotTraj);}
-   return getTotalUtility(robotTraj);
-  }});
+    
+   if (debug2) {console.log('obs, counts, robot ' +
+                           observedTrajectory, counts, robotTraj);;}
+   return getTotalUtility({traj:robotTraj, getUtility:getUtility});
+  }}));
+};
+
+
+var IRLRobotScore = function(options){
+   assert.ok(_.has(options, 'MDP') &&
+             _.has(options, 'length') &&
+             _.has(options, 'priors') &&
+             _.has(options, 'beta') &&
+             _.has(options, 'discount'), 'IRLRobotScore args: missing one '+
+             'or more of MDP, beta, length, priors, discount');
+  
+  var betaType=options.beta;
+  //assert.ok((betaType=='fixed')||(betaType=='variable'), 'beta must be "fixed"+
+  //          ' or "variable"');
+  
+  var MDP=options.MDP;
+  var human = softMaxAgent({MDP:MDP, discount:options.discount});
+  var length = options.length;
+  var MDPParams = ({actions:MDP.actions, transitions:MDP.transitions, 
+                     states:MDP.states, startStates:MDP.startStates});
+  var getUtility = MDP.getUtility;
+  var robotBetas = mapN(function(n){return 0.001}, length); //robot has very low beta
+  
+  return expectation(Infer({model(){
+    var observedTrajectory = makeTrajectory({MDP:MDP, length:length, agent:human}); 
+    var sample = sample(posterior({priors:options.priors, 
+                                   discount:options.discount,
+                                   observedTrajectory:observedTrajectory,
+                                   MDPParams:MDPParams,
+                                   beta:betaType}));
+    
+   
+    //robot MDP has sampled utilities and very low betas everywhere
+    var robotMDP = createMDP({actions:params.actions, transitions:params.transitions, 
+                     states:params.states, startStates:params.startStates, 
+                     utilities:sample.utilities, betas:robotBetas});
+    var robot = softMaxAgent({MDP:robotMDP, discount:options.discount});
+    var robotTraj = makeTrajectory({length:length, MDP:robotMDP, 
+                               agent:robot});
+    
+    return getTotalUtility({traj:robotTraj, getUtility:getUtility});
+
+  }}));
 };
 
 
@@ -357,38 +423,49 @@ var transition = function(options) {
 var states = ['start1', 'start2', 'A', 'B'];
 var startStates = ['start1','start2'];
 var betas = [1,1,1,10];
-var utilities = [1,1,1,2];
+var utilities = [1,1,1,10];
 
 var params = {actions:actions, transitions:transition, states:states, 
               startStates:startStates};
 
 var utilityPriors = mapN(
-  function(n){return Categorical({ps:[2,1], vs:[1,20]})}
+  function(n){return Categorical({ps:[1,1], vs:[1,10]})}
   , 4);
 var betaPriors = mapN(
   function(n){Categorical({ps:[1,1], vs:[1,10]})}, 
   4);
-var priors = {utilities:utilityPriors, betas:betaPriors};
+var singleBetaPrior = Categorical({ps:[11], vs:[1,10]});
+var priors1 = {utilities:utilityPriors, betas:betaPriors};
+var priors2 = {utilities:utilityPriors, betas:singleBetaPrior};
 
 console.log(utilityPriors, betaPriors);
-
+console.log('call 3');
 var MDP = createMDP({states:states,startStates:startStates, actions:actions, 
                     transitions:transition, utilities:utilities, betas:betas});
 
 var agent = softMaxAgent({discount:0.9, MDP:MDP});
-var traj = makeTrajectory({length:10, agent:agent, MDP:MDP});
+//var traj = makeTrajectory({length:5, agent:agent, MDP:MDP});
 
-print(traj);
+//print(traj);
 
 //var post = posterior({priors:priors, MDPParams:params, 
 //                      discount:0.9, observedTrajectory:traj});
 //viz(post);
-
-var score = humanScore({MDP:MDP, discount:0.9, length:9});
-print(score);
+var params = {MDP:MDP, discount:0.9, length:8}
+var score = humanScore(params);
+print('human '+ score);
 //var getActions = MDP.getActions;
 //print(actions)
 //print(states);
 //print(map(getActions, states));
 //var counts = getCounts({states:states, getActions:getActions, traj:traj});
 //print(counts);
+
+var params1 = {MDP:MDP, discount:0.9, length:8, priors:priors2, beta:"fixed"};
+var params2 = {MDP:MDP, discount:0.9, length:8, priors:priors1, beta:"variable"};
+
+var robotScoreFixed = IRLRobotScore(params1);
+print('fixed '+robotScoreFixed);
+
+var robotScoreVariable = IRLRobotScore(params2);
+print('variable '+robotScoreVariable);
