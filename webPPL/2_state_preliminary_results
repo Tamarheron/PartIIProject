@@ -1,0 +1,33 @@
+traj length: 3 nSamples: 100 betas: 1,10 utilities: 1,10
+human 21.97323879647491
+fixed 19.47
+variable 21.27
+traj length: 4 nSamples: 100 betas: 1,10 utilities: 1,10
+human 30.01478543026909
+fixed 26.680000000000007
+variable 27.489999999999995
+traj length: 5 nSamples: 100 betas: 1,10 utilities: 1,10
+human 37.979181210958934
+fixed 35.24
+variable 35.779999999999994
+traj length: 10 nSamples: 100 betas: 1,10 utilities: 1,10
+human 77.60799999999999
+fixed 78.04
+variable 82.98999999999998
+
+traj length: 3 nSamples: 100
+human 19.698717486220588
+fixed 18.705000000000005
+variable 18.789375000000007
+traj length: 4 nSamples: 100
+human 26.864832560215834
+fixed 25.645000000000003
+variable 25.76312500000001
+traj length: 5 nSamples: 100
+human 34.03094763421109
+fixed 33.21500000000001
+variable 32.97312500000001
+traj length: 10 nSamples: 100
+human 69.92009033101701
+fixed 69.87812500000003
+variable 70.40687500000003
