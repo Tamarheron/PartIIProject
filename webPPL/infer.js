@@ -180,7 +180,7 @@ var posterior = function(options){
             _.has(options, 'beta') &&
             _.has(options, 'observedTrajectory'),
            'posterior args missing one or more of ' +
-            'priors, MDPParams,discount, beta, observedTrajectory');
+            'priors, MDPParams,discount, beta (betaType), observedTrajectory');
   
   var betaType=options.beta;
   //assert.ok((betaType=='fixed') || (betaType=='variable'), 'beta must be "fixed"+
@@ -475,27 +475,11 @@ var agent = softMaxAgent({discount:0.9, MDP:MDP});
 
 
 var simulate2StateMDP = function(len,nSamples){
-
   //simple 2-state determinstic MDP    <A-B> 
 
-  var actions = [['A', 'B'], ['A', 'B']];
-  var states = ['A', 'B'];
-  var startStates = ['A', 'B'];
-  var betas = [1,10];
-  var utilities = [1,10];
-  var transition = function(options) {
-    assert.ok( _.has(options, 'state') && 
-               _.has(options, 'action'), 'transition args: missing one or more ' +
-             'of state, action');
-    var action=options.action;
-    var state=options.state;
-    var nextProbs = (action === 'A') ? [1,0] : [0,1];
-    return Categorical({ps:nextProbs, vs:states});
-  };
+  console.log('traj length: '+len+' nSamples: '+nSamples);
 
-  var humanParams = {actions:actions, transitions:transition, states:states, 
-                startStates:startStates};
-
+  //define priors
   var utilityPriors = mapN(
     function(n){return Categorical({ps:[1,1], vs:[1,10]})}
     , 2);
@@ -506,32 +490,203 @@ var simulate2StateMDP = function(len,nSamples){
   var variablePriors = {utilities:utilityPriors, betas:betaPriors};
   var fixedPriors = {utilities:utilityPriors, betas:singleBetaPrior};
 
-  var MDP = createMDP({states:states,startStates:startStates, actions:actions, 
-                      transitions:transition, utilities:utilities, betas:betas});
+
+  //define action set, states, transitions
+  var actions = [['A', 'B'], ['A', 'B']];
+  var states = ['A', 'B'];
+  var startStates = ['A', 'B'];
+
+  var transition = function(options) {
+    assert.ok( _.has(options, 'state') && 
+               _.has(options, 'action'), 'transition args: missing one or more ' +
+                 'of state, action');
+    var action=options.action;
+    var state=options.state;
+    var nextProbs = (action === 'A') ? [1,0] : [0,1];
+    return Categorical({ps:nextProbs, vs:states});
+  };
+
+  var debug =false;
+  
+  //Infer over possible MDP setups, drawn from priors
+  var humanScoreRes = expectation(Infer({method:"enumerate", model(){
+    //sample betas and utilities
+    var betas = map(sample,betaPriors);
+    var utilities = map(sample,utilityPriors);
+    
+    var MDP = createMDP({states:states,startStates:startStates, actions:actions, 
+                        transitions:transition, utilities:utilities, betas:betas});
 
 
-  var agent = softMaxAgent({discount:0.9, MDP:MDP});
+    var humanScoreSample = humanScore({length:len, MDP:MDP, discount:0.9});
+    
+    if(debug){
+      console.log('humanScoreSample: '+humanScoreSample+' betas '+betas+' utilities '+utilities);
+    };
 
-  var params = {MDP:MDP, discount:0.9, length:len}
-  var score = humanScore(params);
-  console.log('len: '+len+'nSamples: '+nSamples);
-  console.log('human '+ score);
+    return humanScoreSample
+  }}));
 
-  var params1 = {MDP:MDP, discount:0.9, length:len, priors:fixedPriors, 
-    beta:"fixed", nSamples:nSamples};
-  var params2 = {MDP:MDP, discount:0.9, length:len, priors:variablePriors,
-   beta:"variable", nSamples:nSamples};
+  var robotScoreFixed = expectation(Infer({method:"enumerate", model(){
+    //sample betas and utilities
+    var betas = map(sample,betaPriors);
+    var utilities = map(sample,utilityPriors);
+    
+    var MDP = createMDP({states:states,startStates:startStates, actions:actions, 
+                        transitions:transition, utilities:utilities, betas:betas});
 
-  var robotScoreFixed = IRLRobotScore(params1);
+    var paramsFixed = {MDP:MDP, discount:0.9, length:len, priors:fixedPriors, 
+      beta:"fixed", nSamples:nSamples};
+
+    var score = IRLRobotScore(paramsFixed);
+    return score
+  }}));
+    
+  var robotScoreVariable = expectation(Infer({method:"enumerate", model(){
+    //sample betas and utilities
+    var betas = map(sample,betaPriors);
+    var utilities = map(sample,utilityPriors);
+    
+    var MDP = createMDP({states:states,startStates:startStates, actions:actions, 
+                        transitions:transition, utilities:utilities, betas:betas});
+
+    var paramsVariable = {MDP:MDP, discount:0.9, length:len, priors:variablePriors,
+     beta:"variable", nSamples:nSamples};
+
+    var score = IRLRobotScore(paramsVariable);
+    return score
+  }}));
+
+  console.log('human '+ humanScoreRes);
   console.log('fixed '+robotScoreFixed);
-
-  var robotScoreVariable = IRLRobotScore(params2);
-  console.log('variable '+robotScoreFixed);
+  console.log('variable '+robotScoreVariable);
 }
 
 
-var trajLengths = [1,2,3,4,5,6,7,8,9,10,12,14,16,18,20,30];
-var nSamplesList = [100,200,500,1000];
+var simulateSpecific2StateMDP = function(len,nSamples){
+  //simple 2-state determinstic MDP    <A-B> 
+
+  //define priors
+  var utilityPriors = mapN(
+    function(n){return Categorical({ps:[1,1], vs:[1,10]})}
+    , 2);
+  var betaPriors = mapN(
+    function(n){Categorical({ps:[1,1], vs:[1,10]})}, 
+    2);
+  var singleBetaPrior = Categorical({ps:[1,1], vs:[1,10]});
+  var variablePriors = {utilities:utilityPriors, betas:betaPriors};
+  var fixedPriors = {utilities:utilityPriors, betas:singleBetaPrior};
+
+
+  //define action set, states, transitions, utilities, betas
+  var actions = [['A', 'B'], ['A', 'B']];
+  var states = ['A', 'B'];
+  var startStates = ['A', 'B'];
+  var betas = [1,10];
+  var utilities = [1,10];
+
+  var transition = function(options) {
+    assert.ok( _.has(options, 'state') && 
+               _.has(options, 'action'), 'transition args: missing one or more ' +
+                 'of state, action');
+    var action=options.action;
+    var state=options.state;
+    var nextProbs = (action === 'A') ? [1,0] : [0,1];
+    return Categorical({ps:nextProbs, vs:states});
+  };
+
+
+  var MDP = createMDP({states:states,startStates:startStates, actions:actions, 
+                        transitions:transition, utilities:utilities, betas:betas});
+  var paramsFixed = {MDP:MDP, discount:0.9, length:len, priors:fixedPriors, 
+      beta:"fixed", nSamples:nSamples};
+  var paramsVariable = {MDP:MDP, discount:0.9, length:len, priors:variablePriors,
+     beta:"variable", nSamples:nSamples};
+  var agent = softMaxAgent({MDP:MDP, discount:0.9});
+
+  var traj = makeTrajectory({length:len, MDP:MDP, agent:agent});
+  var humanScoreRes = humanScore({length:len, MDP:MDP, discount:0.9});
+  var robotScoreFixed = IRLRobotScore(paramsFixed);
+  var robotScoreVariable = IRLRobotScore(paramsVariable);
+
+  console.log('traj length: '+len+' nSamples: '+nSamples+
+    " betas: "+betas+" utilities: "+utilities);
+  console.log('example traj: '+traj);
+  console.log('human '+ humanScoreRes);
+  console.log('fixed '+robotScoreFixed);
+  console.log('variable '+robotScoreVariable);
+}
+
+var simulateDangerMDP = function(len,nSamples){
+  //simple 2-state determinstic MDP    <A-B> 
+
+  //define priors
+  var utilityPriors = mapN(
+    function(n){return Categorical({ps:[1,1,1], vs:[1,2,-5]})}
+    , 3);
+  var betaPriors = mapN(
+    function(n){Categorical({ps:[1,1], vs:[1,10]})}, 
+    3);
+  var singleBetaPrior = Categorical({ps:[1,1], vs:[1,10]});
+  var variablePriors = {utilities:utilityPriors, betas:betaPriors};
+  var fixedPriors = {utilities:utilityPriors, betas:singleBetaPrior};
+
+
+  //define action set, states, transitions, utilities, betas
+  var actions = [['safe', 'risky', 'bad'], ['safe', 'risky', 'bad'],['safe', 'risky', 'bad']];
+  var states = ['safe', 'risky', 'bad'];
+  var startStates = ['safe'];
+  var betas = [1,10,10];
+  var utilities = [1,2,-5];
+
+  var transition = function(options) {
+    assert.ok( _.has(options, 'state') && 
+               _.has(options, 'action'), 'transition args: missing one or more ' +
+                 'of state, action');
+    var action=options.action;
+    var state=options.state;
+    var nextProbs = (action === 'safe') ? [1,0,0] : 
+                    (action === 'risky') ?[0,1,0] : [0,0,1];
+    return Categorical({ps:nextProbs, vs:states});
+  };
+
+
+  var MDP = createMDP({states:states,startStates:startStates, actions:actions, 
+                        transitions:transition, utilities:utilities, betas:betas});
+
+
+  var paramsFixed = {MDP:MDP, discount:0.9, length:len, priors:fixedPriors, 
+      beta:"fixed", nSamples:nSamples};
+  var paramsVariable = {MDP:MDP, discount:0.9, length:len, priors:variablePriors,
+     beta:"variable", nSamples:nSamples};
+
+  var humanScoreRes = humanScore({length:len, MDP:MDP, discount:0.9});
+  var robotScoreFixed = IRLRobotScore(paramsFixed);
+  var robotScoreVariable = IRLRobotScore(paramsVariable);
+
+  console.log('traj length: '+len+' nSamples: '+nSamples+
+    " betas: "+betas+" utilities: "+utilities);
+  console.log('human '+ humanScoreRes);
+  console.log('fixed '+robotScoreFixed);
+  console.log('variable '+robotScoreVariable);
+}
+var trajLengths = [3,4,5,10];
+var nSamplesList = [100];
+
+
+
+var sim2 = map(
+  function(nSamples){
+    return map(
+      function(trajLength){
+        return simulateSpecific2StateMDP(trajLength, nSamples);
+      }, trajLengths
+    );
+  }, nSamplesList
+  );
+
+
+
 
 var sim = map(
   function(nSamples){
@@ -542,15 +697,6 @@ var sim = map(
     );
   }, nSamplesList
   );
-
-
-
-
-
-
-
-
-
 
 
 
