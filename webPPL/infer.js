@@ -76,8 +76,8 @@ var softMaxAgent = function(options) {
   var getBeta = MDP.getBeta;
   var discount = options.discount;
   var getTransition=MDP.getTransition;
-  var getExpectedUtility = MDP.getExpectedUtility;
-  var debug = true;
+  var getUtility = MDP.getUtility;
+  var debug = false;
   var getEU = dp.cache(function(options) {
     
     if(debug){console.log('called eu');};
@@ -85,19 +85,19 @@ var softMaxAgent = function(options) {
        assert.ok(_.has(options, 'state') &&
                  _.has(options, 'action') &&
                  _.has(options, 'length'), 
-                 'getExpectedUtility args:' +
+                 'getEU args:' +
                  'one or more of state, action is missing');
 
     var current = options.state;
     var action = options.action;
     var length = options.length;
-    var currentUtil = getExpectedUtility({state:current, action:action});
+    var currentUtil = getUtility(current);
     
     var discountedFutureUtil =  expectation(Infer({method:'enumerate', model() { 
        var next = sample(getTransition({state:current, action:action}));
-       assert.ok((length>=0), 'length cannot be negative');
-       if (length==0){
-         return 0;
+       assert.ok((length>0), 'length cannot be negative');
+       if (length==1){
+          return 0;
        } else{
          var newLength = length-1;
          var nextAction = sample(act({state:next, length:newLength}));
@@ -130,7 +130,7 @@ var softMaxAgent = function(options) {
         model() {
           var action = uniformDraw(actions);
           var eu = getEU({state: state, action:action, length:length});
-          var debugPrint = true;
+          var debugPrint = false;
           if (debugPrint){
             console.log("action: " + action + "   state: " + state + 
                   '  length: ' + length +
@@ -760,7 +760,7 @@ if(false){
   var actions = [['safe', 'risky', 'bad'], ['safe', 'risky', 'bad'],['safe', 'risky', 'bad']];
   var states = ['safe', 'risky', 'bad'];
   var startStates = ['safe'];
-  var betas = [1,20,20];
+  var betas = [0.1,20,20];
   var utilities = [1,2,-5];
 
   var transition = function(options) {
@@ -781,9 +781,10 @@ if(false){
   var agent = softMaxAgent({MDP:MDP, discount:0.99});
 
   
-  var traj = makeTrajectory({length:5, MDP:MDP, agent:agent});
+  var trajs = mapN(function(n){
+    return makeTrajectory({length:5, MDP:MDP, agent:agent})},20);
 
-  console.log(traj)
+  console.log(trajs)
   console.log(agent);
 
 
