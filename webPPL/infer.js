@@ -545,6 +545,10 @@ var simulate2StateMDP = function(len,nSamples){
   console.log('variable '+robotScoreVariable);
 }
 
+var specificMDPResults = [[['len'],['human'],['fixed'],['variable']],[[1]],[[2]],[[3]],[[4]],
+    [[5]],[[6]],[[7]],[[8]],[[9]],[[10]],[[11]],[[12]],[[13]],[[14]],[[15]],[[16]],[[17]],
+    [[18]],[[19]],[[20]],[[21]],[[22]],[[23]],[[24]],[[25]]];
+
 
 var simulateSpecific2StateMDP = function(len,nSamples){
   //simple 2-state determinstic MDP    <A-B> 
@@ -604,7 +608,7 @@ var simulateSpecific2StateMDP = function(len,nSamples){
     var exampleTraj= makeTrajectory(trajParams);
     //console.log('created example traj, traj length: '+len);
     return exampleTraj;
-  },20);
+  },2);
   
   console.log('created trajs, traj length: '+len);
 
@@ -612,18 +616,28 @@ var simulateSpecific2StateMDP = function(len,nSamples){
   console.log(trajs);
 
   var humanScoreRes = humanScore({length:len, MDP:MDP, discount:0.99});
+  specificMDPResults[len].push([humanScoreRes]);
   console.log('human '+ humanScoreRes);
 
   var robotScoreFixed = IRLRobotScore(paramsFixed);
+  specificMDPResults[len].push([robotScoreFixed]);
   console.log('fixed '+robotScoreFixed);
-  
+
   var robotScoreVariable = IRLRobotScore(paramsVariable);
+  specificMDPResults[len].push([robotScoreVariable]);
+
   console.log('variable '+robotScoreVariable);
+  console.log(specificMDPResults);
 
   console.log('finished computing specific MDP with '+
     'traj length: '+len+' nSamples: '+nSamples+
     " betas: "+betas+" utilities: "+utilities);
 }
+
+var specificMDPResults = [[['len'],['human'],['fixed'],['variable']],[[1]],[[2]],[[3]],[[4]],
+    [[5]],[[6]],[[7]],[[8]],[[9]],[[10]],[[11]],[[12]],[[13]],[[14]],[[15]],[[16]],[[17]],
+    [[18]],[[19]],[[20]],[[21]],[[22]],[[23]],[[24]],[[25]]];
+
 
 var simulateDangerMDP = function(len,nSamples){
   //simple 2-state determinstic MDP    <A-B> 
@@ -670,7 +684,7 @@ var simulateDangerMDP = function(len,nSamples){
 
   var agent = softMaxAgent({MDP:MDP, discount:0.99});
 
-  var trajs = mapN(function(n){return makeTrajectory({length:len, MDP:MDP, agent:agent})},20);
+  var trajs = mapN(function(n){return makeTrajectory({length:len, MDP:MDP, agent:agent})},2)
   console.log('traj length: '+len+' nSamples: '+nSamples+
     " betas: "+betas+" utilities: "+utilities);
 
@@ -679,20 +693,28 @@ var simulateDangerMDP = function(len,nSamples){
 
 
   var humanScoreRes = humanScore({length:len, MDP:MDP, discount:0.99});
+  dangerMDPResults[len].push(humanScoreRes);
   console.log('human '+ humanScoreRes);
 
   var robotScoreFixed = IRLRobotScore(paramsFixed);
+  dangerMDPResults[len].push(robotScoreFixed);
   console.log('fixed '+robotScoreFixed);
 
   var robotScoreVariable = IRLRobotScore(paramsVariable);
+  dangerMDPResults[len].push(robotScoreVariable);
+
   console.log('variable '+robotScoreVariable);
+  console.log(dangerMDPResults);
+
 }
 
-var trajLengths = [5,8,10,15,20,25];
-var nSamplesList = [100, 200];
+var trajLengths = [5,8,10,15];
+var nSamplesList = [20,50,100];
 
 
-if(false){
+
+
+if(true){
   var sim1 = map(
     function(nSamplesLambda){
       return map(
@@ -700,6 +722,18 @@ if(false){
           console.log('calling specific with nSamples, '+
             nSamplesLambda+' trajLength '+trajLengthLambda);
           return simulateSpecific2StateMDP(trajLengthLambda, nSamplesLambda);
+        }, trajLengths
+      );
+    }, nSamplesList
+    );
+
+  console.log('break');
+
+  var sim3= map(
+    function(nSamples){
+      return map(
+        function(trajLength){
+          return simulateDangerMDP(trajLength, nSamples);
         }, trajLengths
       );
     }, nSamplesList
@@ -718,18 +752,7 @@ if(false){
     );
 
 
-  console.log('break');
-
-
-  var sim3= map(
-    function(nSamples){
-      return map(
-        function(trajLength){
-          return simulateDangerMDP(trajLength, nSamples);
-        }, trajLengths
-      );
-    }, nSamplesList
-    );
+  
 }
 
 
