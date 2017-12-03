@@ -1,0 +1,87 @@
+calling specific with nSamples, 100 trajLength 5
+traj length: 5 nSamples: 100 betas: 1,10 utilities: 1,10
+human 37.21999999999999
+fixed 34.07
+variable 34.24999999999999
+finished computing specific MDP with traj length: 5 nSamples: 100 betas: 1,10 utilities: 1,10
+
+calling specific with nSamples, 200 trajLength 5
+traj length: 5 nSamples: 200 betas: 1,10 utilities: 1,10
+human 36.59
+fixed 32.72
+variable 36.275
+finished computing specific MDP with traj length: 5 nSamples: 200 betas: 1,10 utilities: 1,10
+
+calling specific with nSamples, 100 trajLength 8
+traj length: 8 nSamples: 100 betas: 1,10 utilities: 1,10
+human 59.12000000000001
+fixed 58.67
+variable 61.28
+finished computing specific MDP with traj length: 8 nSamples: 100 betas: 1,10 utilities: 1,10
+
+calling specific with nSamples, 200 trajLength 8
+traj length: 8 nSamples: 200 betas: 1,10 utilities: 1,10
+human 59.93
+fixed 55.474999999999994
+variable 63.30499999999999
+finished computing specific MDP with traj length: 8 nSamples: 200 betas: 1,10 utilities: 1,10
+
+calling specific with nSamples, 100 trajLength 10
+traj length: 10 nSamples: 100 betas: 1,10 utilities: 1,10
+human 75.52
+fixed 74.88999999999999
+variable 83.17000000000003
+finished computing specific MDP with traj length: 10 nSamples: 100 betas: 1,10 utilities: 1,10
+
+calling specific with nSamples, 200 trajLength 10
+traj length: 10 nSamples: 200 betas: 1,10 utilities: 1,10
+human 76.05999999999999
+fixed 74.75499999999998
+variable 81.01000000000002
+finished computing specific MDP with traj length: 10 nSamples: 200 betas: 1,10 utilities: 1,10
+
+
+calling specific with nSamples, 100 trajLength 15
+traj length: 15 nSamples: 100 betas: 1,10 utilities: 1,10
+human 114.27
+fixed 119.39999999999999
+variable 130.29
+finished computing specific MDP with traj length: 15 nSamples: 100 betas: 1,10 utilities: 1,10
+
+calling specific with nSamples, 200 trajLength 15
+traj length: 15 nSamples: 200 betas: 1,10 utilities: 1,10
+human 111.48
+fixed 123.31499999999998
+variable 135.14999999999998
+finished computing specific MDP with traj length: 15 nSamples: 200 betas: 1,10 utilities: 1,10
+
+
+calling specific with nSamples, 100 trajLength 20
+traj length: 20 nSamples: 100 betas: 1,10 utilities: 1,10
+human 154.19
+fixed 175.25000000000003
+variable 187.57999999999998
+finished computing specific MDP with traj length: 20 nSamples: 100 betas: 1,10 utilities: 1,10
+
+calling specific with nSamples, 200 trajLength 20
+traj length: 20 nSamples: 200 betas: 1,10 utilities: 1,10
+human 152.12
+fixed 170.615
+variable 186.32
+finished computing specific MDP with traj length: 20 nSamples: 200 betas: 1,10 utilities: 1,10
+
+
+calling specific with nSamples, 100 trajLength 25
+traj length: 25 nSamples: 100 betas: 1,10 utilities: 1,10
+human 189.61000000000004
+fixed 222.19000000000003
+variable 241
+finished computing specific MDP with traj length: 25 nSamples: 100 betas: 1,10 utilities: 1,10
+
+
+calling specific with nSamples, 200 trajLength 25
+traj length: 25 nSamples: 200 betas: 1,10 utilities: 1,10
+human 193.39000000000001
+fixed 224.89000000000001
+variable 241.09000000000003
+finished computing specific MDP with traj length: 25 nSamples: 200 betas: 1,10 utilities: 1,10
